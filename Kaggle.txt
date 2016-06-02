@@ -1,0 +1,144 @@
+2. Imputation I tried imputing both for a combined/ cleansed data set (train + test) or separately. Combined gives a slight boost I also tried different imputation methods (complete(mice(joined_cleansed_set)) or same with method = "rf" (random forrest). RF imputation takes significantly more time and I can`t claim an improvement in predictions
+3. Parallelization Research install.packages("doParallel"). Simple enough and lets you use > 1 core. A bit of advice - use X-2 cores. 
+4. RF performed nearly as good as NNET or SVM. I think the highest score is coming from NNET model
+5. TrainControl my take on it is "repeatedcv", repeats 10, number 10 Please share if you found a better train control
+6. TuneGrid I started with elaborate per method tuneGrids and gave up. Skip it and let train decide
+7. Ensemble Fancy word for "lets average predictions". Ive tried average score, majority and combinations (with/without SVM) HAVE NOT improved my score while I read that it got some folks up to 0.86
+
+
+ I've tried selecting Q's that seem to be correlated with Party but apart from speeding things up a little, it doesn't do anything to improve accuracy. Ditto with normalising YOB and setting the outliers to NA prior to imputing.
+Imputing all the columns in the data frame took too long. I replaced all the NA values with the string "missing", and then I treated the word "missing" as its own factor level.
+Then I imputed YOB.
+
+Imputing the values doesn't take that long. You just don't want to do it every time. Instead, try writing the imputed results to a file and then loading them when you want to try again.
+
+Parallel computing with mice
+http://stackoverflow.com/questions/24040280/parallel-computation-of-multiple-imputation-by-using-mice-r-package
+
+I've tried multiple clustering methods both on imputed data, data with NA's in questions changed to "No Answer", and on datasets with NA's, and then combining it with glm, rpart, j48 and randomForest models.My best result hovers about .61.
+
+Since I have been working from the very beginning and the prediction performance is not improving anymore, I'm going to restart from scratch, this time with 3-level ordered factors for the questions and a more through analysis on multicolinearity.
+
+I introduced a 3rd factor level "None" into my Party variable. I'm guessing I need to eliminate that.Update II: droplevels() apparently did the trick.
+
+This error surprises me as well. The problem is likely from the fact that a data.frame can have more levels for a variable than are actually present, so there is some "noise" leftover in the list of Gender factors. (For example, you could have factor levels "M", "F" and "", even though only "M" and "F" are present.)
+Try: train$xlevels[["Gender"]] <- union(train$xlevels[["Gender"]], levels(test$Gender))
+which will ensure your factor levels match in both sets. Then rerun the regressions with Gender included, and you should see no errors.
+did you run the imputation only on the training set or on the testing set too? If you ran it only on the training set, the testing set will still have the blank level ("") for the Gender variable. And if that is the case, nothing will work, because every variable after Gender will have an extra blank level, so you'll need to impute values for the testing set too.
+I ran into this error too and don't think it is a result of imputation. It seems to be a result of simply replacing the (" ") with NA in the training dataset. For some reason, " " seems to be considered a "level" whereas "NA" does not. If you run str on the original train2016 dataset, you see that "gender" is a factor with 3 levels, income has 7 levels, and all of the questions have 3 levels. If you simply replace "" with NA in the train2016dataset and run str on the resulting dataset, you see that all factors have one fewer level than before (e.g., gender has 2 levels rather than 3). If you replace "" with NA in the test dataset, the number of levels will be reduced by one also, and you won't get the error. It does seem a bit odd that " " and NA should be treated differently if they both represent missing data.
+They represent missing data for humans, but not for the computer. " " is no different than "a string" for the R interpreter regarding the nature of the object, unlike NA.
+
+
+
+
+
+Just a question about imputation as someone mentioned that it takes about 3-4 hours. But when I do it, it does not take more than 20 minutes. Here is my code. Am I doing something wrong?
+dfTrain = read.csv("train2016.csv", na.strings=c("","NA"))
+dfTest = read.csv("test2016.csv", na.strings=c("","NA"))
+target = dfTrain$Party
+testUserID = dfTest$USER_ID
+dfTrain[,'USER_ID'] = NULL
+dfTrain[,'Party'] = NULL
+dfTest[, 'USER_ID'] = NULL
+sf = rbind(dfTrain, dfTest)
+library(mice)
+imputed = complete(mice(sf))
+newTrain = imputed[1:nrow(dfTrain), ]
+newTest  = imputed[(nrow(dfTrain)+1):nrow(imputed), ]
+newTrain$Party = target
+And then do I need to convert the Factors into Numerics to use the imputed data for let's say Random Forest?
+
+make use of visualizations, there are clear trends between profile features that you can use to make reasonable imputations. The content of unit 7 really helped me in this part.
+
+
+So far, I have tested both partial (only on demographics variables) and full imputations, and the latter greatly improved the predictions. Using CART, there were significant changes on the split variables.
+
+variable <- complete(mice(data[,2:107] ) should do the trick but don't forget to remove the Party variable as well just to be sure.
+
+superset = rbind(df1, df2)
+# Do some manipulation on superset
+df1 = superset[1:nrow(df1),]
+df2 = superset[(nrow(df1)+1):nrow(superset),]
+
+train[-c(1, 7)]
+
+converting YOB to a factor variable is also a possibility.
+Ages that are greater than 100 are probably just wrong data and you can discard them.
+
+hi all, any good text on the topic of TREES and R?
+http://www-bcf.usc.edu/~gareth/ISL/ISLR%20Sixth%20Printing.pdf take a look at ch 8. there are also related videos on youtube
+
+in order for logistic regression/CART/RF to do a regression, you will have to replace NA with something, or else these methods will by default ignore the entire observation.
+
+
+
+To turn a factor variable into a numeric, you can always do: train$var = as.numeric(train$var). This will turn, for example, 'True' and 'False' into 1 and 0. You can then run preProcess or something similar to normalize/center the values, and it will likely become 1 and -1. This is a workable approach for clustering with a binary factor, however ....
+In general you need to be careful when translating variables with discrete "factors" into numbers for clustering because clustering uses the idea of distance between points: people with heights of 6 ft and 5.9 ft are closer than people with heights 5' and 5.1', for example. But if you had factors for a color variable of Red, Blue, and Green, you could turn that into 1, 2, and 3 and run clustering, but is it accurate to say Red and Blue are closer (distance 1) than Red and Green (distance 2)? Probably not.
+
+
+
+Let's say we wanted to make 5 variables var1,..., var5 which are equal to 1,...,5. Then, we could use the following loop
+for (i in 1:5) {assign(paste("var", i, sep = ""), i)}
+
+
+
+
+We'll often have to make the same changes to the test data as we have made to the train data. If we change a variable from numeric to factor or create a new variable in train ( or impute) we'll have to do the same in test. These type of things would be normal data preparation if we were handed a new data set. We can't leave the test data untouched. 
+In general, we can't let what we learn from the test data affect the decisions we make when training a model....but we violate that by predicting on the test data over and over...our score affects our training decisions. Kaggle only scores on a portion of our submission to lessen this affect.
+
+I made my first entry as a simple decision tree model for the competition problem.When I did the predictions on my test set, I got a message: "Contrasts dropped from factor variable " this was followed by the names of the factor variables. 
+i had same thing happen to me, the imputed results come with attributes for the factors. you will see this if you do str(imputedData) for each variable you will see additional information listed. "Contrasts" "dimnames" etc. 
+ My work around was to save my imputed data frame results to a CSV file and then read it back and by doing this the attributes were removed. Doing this is a good idea anyway to avoid rerunning imputation. 
+
+
+
+Thanks for following up your question AFBM! as.numeric() will take a categorical variable and turn it into a number, and as.factor() will take a numeric variable and turn it into a categorical/factor variable.
+For example if you had a column of 1's and 2's that were encoded as numbers, and you wanted to just have them be 0-1 or True-False type factors, you could do data$var = as.factor(data$var). And as you pointed out, to go the other way, do data$var = as.numeric(data$var)
+
+
+
+If you do not have Jupyter installed, there is some background information about requirements here. http://irkernel.github.io/requirements/
+For general background information on Jupyter notebooks see here: https://www.continuum.io/blog/developer/jupyter-and-conda-r
+In my opinion, using KnitR in RStudio is neater than Jupyter. Jupyter is better for IPython Notebook.
+After installing Jupyter, run the following to add R:
+conda install -c r r-essentials
+
+
+
+Is there a way to get R to count the number of tree splits? 
+the information shown by summary() comes from model$cptable, so we can extract the number of splits in the tree with max(model$cptable[,2])
+easy way to count splits: use plot(model) rather than or in addition to prp(model), where model is a tree.
+
+
+how do we save data in R. I want to impute data, and everyone comments on how long it takes. I want to save my mice output so that I can go back to it later. How do I actually do this? 
+write.csv(train_impute, "train_imputed_file.csv", row.names = FALSE)
+this will write your data named "train_impute" to a file named "train_imputed_file.csv". This will be stored in your working directory. You would want to do this with an imputed test file also. You could also write to a RData file, but csv works as well in this case. 
+
+
+
+
+
+I did Imputation , my all demographic variable are full without any missing values. Other variables (8-101) in yes/No/NA form. Here I need your help to convert these into ("Yes"=1, "NA"=0, "No"=-1). 
+check this factor(c("yes","no"),levels=c("yes","no"), labels = c(1,0))
+Keep in mind a lot of the questions have answers other than "Yes" and "No". This should get you started:
+train[,8:108][train[,8:108] == "Yes"] = "1"
+train[,8:108][train[,8:108] == "No"] = "-1"
+train[,8:108][is.na(train[,8:108])] = "0"
+
+I did the following:
+train <- read.csv("train2016.csv", header=T, na.strings=c("", "NA"), stringsAsFactors = FALSE) test <- read.csv("test2016.csv", header=T, na.strings=c("", "NA"), stringsAsFactors = FALSE)
+After imputation of demographic variables, I did the following: train[train=="Yes"] <- 1 train[train=="NA"] <- 0 train[train=="No"] <- -1
+Now I have to convert them from character to Numeric type,
+
+CART, and consequently random forests, can deal with categorical variables without any transformation. Logistic regression, on the other hand, can only work with numeric variables. Because of this, glm converts factor variables into multiple binary dummy variables. 
+So to finally answer your question, yes, glm, rpart and randomForest can deal with factor variables.
+
+
+
+As far as I know, we have no choice but to convert the factor variables to numerical in order to be able to use a function like cor(). An easy way to do the conversion is running the following:
+correlations = cor(sapply(df, as.integer))
+No need to run anything else and works on factors with multiple levels too
+You could also use a categorical specific statistic like the Chi-squared test.
+
+
+Much to my surprise I used the original R script containing the glm() model and simply deleted a few strategically chosen variables. Less turned out to be more as my score rocketed up several hundreds positions and I'm now at 0.63xxx, which I'm happy to settle for with no more worries about data clean-up. 

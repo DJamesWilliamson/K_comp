@@ -142,10 +142,10 @@ sum(output_pairwise_pval < 0.000001)/length(output_pairwise_pval)
 # testTable
 # chisq.test(testTable)$p.value
 
-mat$assocn <- output_pairwise_cut
-head(mat, 20)
+# mat$assocn <- output_pairwise_cut
+# head(mat, 20)
 # Find identities
-mat$identity <- ifelse(mat$Var1 == mat$Var2, TRUE, FALSE)
+# mat$identity <- ifelse(mat$Var1 == mat$Var2, TRUE, FALSE)
 # Find duplicates
 # mat$dup <- ifelse(paste0(mat$Var1, mat$Var2) == paste0(mat$Var2, mat$Var1), TRUE, FALSE)
 # nrow(mat[mat$identity == TRUE | mat$dup == TRUE, ])
@@ -153,6 +153,8 @@ mat$identity <- ifelse(mat$Var1 == mat$Var2, TRUE, FALSE)
 # mat[mat$Var1 == "Q98197" & mat$Var2 == "Q96024", ]
 # head(paste0(mat$Var1, mat$Var2))
 # class(output_pairwise_cut)
+
+# create matrix with the pairwise correlated questions
 mat_pairwise <- matrix(output_pairwise_cut, length(questions), length(questions))
 
 # as.numeric(mat_pairwise)
@@ -162,25 +164,30 @@ rownames(mat_pairwise) <- names(trainChiSq[questions])
 colnames(mat_pairwise) <- names(trainChiSq[questions])
 
 # mat_pairwise[!lower.tri(mat_pairwise)] <- 0  # unnecessary if parameters set below
-sum(mat_pairwise)
+# sum(mat_pairwise)
 
+
+# create graph showing the correlations (edges) between questions (vertices)
 library(igraph)
-?igraph
+# ?igraph
+# take upper triangular matrix and exclude diagonal to avoid repeat/identity matches
 pairwise <- graph_from_adjacency_matrix(adjmatrix = mat_pairwise, 
                                         mode = "upper", 
                                         diag = FALSE,
                                         add.colnames = NULL, add.rownames = NA)
-print(pairwise)
-str(pairwise)
+# print(pairwise)
+# str(pairwise)
 
+# make size proportional to the degree of each vertex
 V(pairwise)$size = degree(pairwise)/2+2
 plot(pairwise, vertex.label=NA)
 
 # How many vertices linked to more than x others
-sum(degree(pairwise) > 20)
-sum(degree(pairwise) > 50)
-max(degree(pairwise))
-min(degree(pairwise))
+# sum(degree(pairwise) > 20)
+# sum(degree(pairwise) > 50)
+# max(degree(pairwise))
+# min(degree(pairwise))
+
 
 no_corr_Q <- which(degree(pairwise) == 0)
 lo_corr_Q <- which(degree(pairwise) < 10)
@@ -194,9 +201,9 @@ hi_corr_Q <- which(degree(pairwise) > 20)
 # names(lo_corr_Q) %in% names(hi_corr_Q)        
 
         
-names(no_corr_Q) %in% sigQs
-names(lo_corr_Q) %in% sigQs
-names(hi_corr_Q) %in% sigQs
+# names(no_corr_Q) %in% sigQs
+# names(lo_corr_Q) %in% sigQs
+# names(hi_corr_Q) %in% sigQs
 
 # High degree questions also correlated with outcome
 a <- hi_corr_Q[names(hi_corr_Q) %in% sigQs]

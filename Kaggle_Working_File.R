@@ -10,10 +10,14 @@ question_list <- read.xlsx("Questions.xlsx", sheetIndex = 1, colIndex = 2:3)
 # Index question list by corresponding column in train
 question_list$idx <- match(question_list$Question_ID, names(trainChiSq))
 head(question_list)
+class(question_list)
 
-?prcomp
+
 # set up a test matrix to explore PCA using questions identified by ChiSq
 head(trainChiSq)
+
+
+
 # use combination of low and high correlation
 lo_corr_Q <- which(degree(pairwise) < 10)
 hi_corr_Q <- which(degree(pairwise) > 20)
@@ -39,36 +43,126 @@ df_PCA <- df_PCA[ , keep_cols]
 lapply(df_PCA, class)
 lapply(df_PCA, levels)
 
-mat_PCA <- as.matrix(df_PCA)
+# try imputation using this method in mice package:
+# Check this:
+# http://stats.stackexchange.com/questions/99185/simultaneous-imputation-of-multiple-binary-variables-in-r
+
+library(mice)
+df_imp <- mice(df_PCA, seed = 1233, method = "logreg") 
+# logistic regression for binary variable 
+#Generates multiple imputations for incomplete multivariate data by Gibbs sampling
+str(df_imp)     # much more complicated structure, see suggestion
+head(df_imp$data)
+df_imp
+
+df_complete <- complete(df_imp)
+head(df_complete)
+
+mat_complete <- data.matrix(df_complete) # convert to numeric matrix for correlation calculation 
+head(mat_complete)
+dim(mat_complete)
+# change responses to 0/1
+mat_complete[mat_complete == 1] <- 0
+mat_complete[mat_complete == 2] <- 1
+head(mat_complete)
+
+# try PCA
+library("pcaMethods")
+# browseVignettes("pcaMethods")
+
+md  <- prep(mat_complete, scale="none", center=FALSE)
+dim(md)
+resPCA <- pca(md, method="svd", center=FALSE, nPcs=5)
+resSVDI <- pca(md, method="svdImpute", center=FALSE, nPcs=5)
+# resBPCA <- pca(md, method="bpca", center=FALSE, nPcs=5)
+# resPPCA <- pca(md, method="ppca", center=FALSE, nPcs=5)
+
+q2SVDI <- Q2(resSVDI, md, fold=10)
+
+slplot(resPCA)
+
+plotPcs(resPPCA, pc=1:3, scoresLoadings=c(TRUE, FALSE))
+
+plotPcs(resSVDI, pc=1:3, scoresLoadings=c(TRUE, FALSE))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##############################################################################
+##############################################################################
+# remove any rows where all are NA
+# idx_NA <- which(rowSums(is.na(md)) == ncol(md))
+# length(idx_NA)
+# md <- md[-idx_NA, ]
+
+pc <- pca(md, nPcs=3, method="ppca", center=FALSE)
+
+imputed <- completeObs(pc)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+################################################################################
+# change responses to 0/1
+df_PCAf <- sapply(df_PCA, as.integer)
+df_PCA[df_PCA == 1] <- 0
+df_PCA[df_PCA == 2] <- 1
+head(df_PCA)
+
+
+mat_PCA <- as.matrix(temp_df)
 dim(mat_PCA)
 mat_PCA[1:10, 1:10]
-head(mat_PCA[mat_PCA == "Yes"], 10)
-head(mat_PCA[mat_PCA == "No"], 10)
+class(mat_PCA)
 
-?lapply
-
-head(data.frame(as.character(df_PCA)))
-
-prcomp(as.matrix(as.numeric(as.character(df_PCA))))
-
-
-class(df_PCA[ , "Q98078"])
-
-?levels
-levels(df_PCA[ , "Q98078"])
+# plot each variable against a range of others
+par(mfrow = c(4, 4))
+for(i in 1:16){
+plot(jitter(mat_PCA[ ,30], 2), jitter(mat_PCA[ ,i], 2), cex = 0.1)
+}
+par(mfrow = c(1, 1))
 
 
-df_PCA <- sapply(df_PCA[ , 1:46], function(x) levels(x) <- c(0, 1))
-sapply(df_PCA[ , 1:46], levels)
-
-?relevel.factor
-
-ncol(df_PCA)
-as.character(df_PCA)
-df_PCA["Yes"] <- 1
-df_PCA["No"] <- 0
-df_mat <- as.matrix(as.logical(df_PCA))
-df_mat
 
 
-df[df == ""] = NA
+
+
+
+
+
+
+
+
+
+
+# Imputation and PCA: not working
+?prcomp
+prcomp(mat_PCA, na.rm = TRUE)
+
+library(BiocInstaller)
+biocLite("pcaMethods")
+
