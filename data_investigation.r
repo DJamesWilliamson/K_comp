@@ -61,7 +61,7 @@ for(i in questions)
 
 #################################################################################
 # Import training set but replace blanks with NA
-trainChiSq <- read.csv("train2016.csv", na.strings = "")
+trainChiSq <- read.csv("train2016.csv", na.strings = c("", "NA"))
 head(trainChiSq[ ,8:12], 15)
 head(trainChiSq[ ,1:8], 15)
 head(names(trainChiSq), 10)
@@ -83,12 +83,18 @@ for(i in questions){
         # print(output)
 }
 output_outcome
+sigQs <- names(trainChiSq)[output_outcome == TRUE]
+sigQs <- sigQs[!is.na(sigQs)]
+sigQs
 
 ################################################################################
 # Pairwise ChiSq between question variables
 # ?expand.grid
-mat <- expand.grid(names(trainChiSq)[8:ncol(trainChiSq)], 
-                   names(trainChiSq)[8:ncol(trainChiSq)])
+# names(trainChiSq)[questions]
+# names(trainChiSq)[8:ncol(trainChiSq)]
+
+mat <- expand.grid(names(trainChiSq)[questions], 
+                   names(trainChiSq)[questions])
 class(mat)
 mat
 
@@ -104,24 +110,31 @@ mat
 # testTable
 # chisq.test(testTable)$p.value
 
-output_pairwise <- vector()
+output_pairwise_cut <- vector()
+output_pairwise_pval <- vector()
 for(i in 1:nrow(mat)){
         resultsTable = table(trainChiSq[ , as.character(mat$Var1)[i]], 
                              trainChiSq[ , as.character(mat$Var2)[i]], 
                              useNA = "no")
         x <- chisq.test( resultsTable)
-        output_pairwise[[i]] <- x$p.value < 0.05
-        # output[[i]][2] <- x$p.value < 0.05
-        # output <- cat(names(train)[i], x$p.value < 0.05, "\n"))
-        # print(output)
+        output_pairwise_cut[[i]] <- x$p.value < 0.000001
+        output_pairwise_pval[[i]] <- x$p.value
 }
-output_pairwise
+head(output_pairwise_cut)
+head(output_pairwise_pval)
+hist(output_pairwise_pval, breaks = seq(from=0, to=1, by=0.01))
+
+sum(output_pairwise_cut)/length(output_pairwise_cut)
+sum(output_pairwise_pval < 0.05)/length(output_pairwise_pval)
+sum(output_pairwise_pval < 0.000001)/length(output_pairwise_pval)
+
+
+
 
 # head(mat)
 # head(trainChiSq[ ,"Q124742"])
 # head(trainChiSq[ , as.character(mat$Var1)[1]])
 # head(mat, 8)
-
 
 # testTable <- table(trainChiSq[, as.character(mat$Var1)[7]], 
 #                    trainChiSq[ ,as.character(mat$Var2)[7]], 
@@ -129,22 +142,22 @@ output_pairwise
 # testTable
 # chisq.test(testTable)$p.value
 
-mat$assocn <- output_pairwise
+mat$assocn <- output_pairwise_cut
 head(mat, 20)
 # Find identities
 mat$identity <- ifelse(mat$Var1 == mat$Var2, TRUE, FALSE)
 # Find duplicates
-mat$dup <- ifelse(paste0(mat$Var1, mat$Var2) == paste0(mat$Var2, mat$Var1), TRUE, FALSE)
-nrow(mat[mat$identity == TRUE | mat$dup == TRUE, ])
-mat[mat$Var1 == "Q96024" & mat$Var2 == "Q98197", ]
-mat[mat$Var1 == "Q98197" & mat$Var2 == "Q96024", ]
-head(paste0(mat$Var1, mat$Var2))
-class(output_pairwise)
-mat_pairwise <- matrix(output_pairwise, length(questions), length(questions))
+# mat$dup <- ifelse(paste0(mat$Var1, mat$Var2) == paste0(mat$Var2, mat$Var1), TRUE, FALSE)
+# nrow(mat[mat$identity == TRUE | mat$dup == TRUE, ])
+# mat[mat$Var1 == "Q96024" & mat$Var2 == "Q98197", ]
+# mat[mat$Var1 == "Q98197" & mat$Var2 == "Q96024", ]
+# head(paste0(mat$Var1, mat$Var2))
+# class(output_pairwise_cut)
+mat_pairwise <- matrix(output_pairwise_cut, length(questions), length(questions))
 
-as.numeric(mat_pairwise)
-length(mat_pairwise)
-dim(mat_pairwise)
+# as.numeric(mat_pairwise)
+# length(mat_pairwise)
+# dim(mat_pairwise)
 rownames(mat_pairwise) <- names(trainChiSq[questions])
 colnames(mat_pairwise) <- names(trainChiSq[questions])
 
@@ -159,7 +172,9 @@ pairwise <- graph_from_adjacency_matrix(adjmatrix = mat_pairwise,
                                         add.colnames = NULL, add.rownames = NA)
 print(pairwise)
 str(pairwise)
-plot(pairwise, vertex.size=5, vertex.label=NA)
+
+V(pairwise)$size = degree(pairwise)/2+2
+plot(pairwise, vertex.label=NA)
 
 # How many vertices linked to more than x others
 sum(degree(pairwise) > 20)
@@ -167,5 +182,34 @@ sum(degree(pairwise) > 50)
 max(degree(pairwise))
 min(degree(pairwise))
 
-V(pairwise)$size = degree(pairwise)/2+2
-plot(pairwise, vertex.label=NA)
+no_corr_Q <- which(degree(pairwise) == 0)
+lo_corr_Q <- which(degree(pairwise) < 10)
+hi_corr_Q <- which(degree(pairwise) > 20)
+
+# Ensure no overlap between groups
+# sort(names(no_corr_Q))
+# sort(names(lo_corr_Q))
+# sort(names(hi_corr_Q))
+# names(no_corr_Q) %in% names(lo_corr_Q)
+# names(lo_corr_Q) %in% names(hi_corr_Q)        
+
+        
+names(no_corr_Q) %in% sigQs
+names(lo_corr_Q) %in% sigQs
+names(hi_corr_Q) %in% sigQs
+
+# High degree questions also correlated with outcome
+a <- hi_corr_Q[names(hi_corr_Q) %in% sigQs]
+question_list[question_list$Question_ID %in% names(a), 1:2]
+
+# High degree questions not correlated with outcome
+b <- hi_corr_Q[!c(names(hi_corr_Q) %in% sigQs)]
+question_list[question_list$Question_ID %in% names(b), 1:2]
+
+# Low degree questions also correlated with outcome
+c <- lo_corr_Q[c(names(lo_corr_Q) %in% sigQs)]
+question_list[question_list$Question_ID %in% names(c), 1:2]
+
+# Low degree questions not correlated with outcome
+d <- lo_corr_Q[!c(names(lo_corr_Q) %in% sigQs)]
+question_list[question_list$Question_ID %in% names(d), 1:2]
