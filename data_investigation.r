@@ -97,40 +97,90 @@ mat <- expand.grid(names(trainChiSq)[questions],
                    names(trainChiSq)[questions])
 class(mat)
 mat
-
+# as.character(mat$Var1[3])
 # head(trainChiSq[ , 8:12], 100)
 # as.character(mat[ ,1])
 # names(train)[8:20]==as.character(mat$Var1)
 # ?table
-# 
+# ?chisq.test
 # 
 # testTable <- table(trainChiSq[, as.character(mat$Var1)[1]], 
 #                    trainChiSq[ ,as.character(mat$Var2)[5]], 
 #                    useNA = "no")
 # testTable
 # chisq.test(testTable)$p.value
-
+output_pairwise_acc <- vector()
 output_pairwise_cut <- vector()
 output_pairwise_pval <- vector()
 for(i in 1:nrow(mat)){
-        resultsTable = table(trainChiSq[ , as.character(mat$Var1)[i]], 
-                             trainChiSq[ , as.character(mat$Var2)[i]], 
+        resultsTable = table(trainChiSq[ , as.character(mat$Var1[i])], 
+                             trainChiSq[ , as.character(mat$Var2[i])], 
                              useNA = "no")
         x <- chisq.test( resultsTable)
+        output_pairwise_acc[[i]] <- (resultsTable[1,1]+resultsTable[2,2])/sum(resultsTable)
         output_pairwise_cut[[i]] <- x$p.value < 0.000001
         output_pairwise_pval[[i]] <- x$p.value
 }
+head(output_pairwise_acc)
 head(output_pairwise_cut)
 head(output_pairwise_pval)
+idx_p.val <- order(output_pairwise_pval)
+head(output_pairwise_pval[idx_p.val], 120)
+
+
+hist(output_pairwise_acc, breaks = seq(from=0, to=1, by=0.01))
 hist(output_pairwise_pval, breaks = seq(from=0, to=1, by=0.01))
 
-sum(output_pairwise_cut)/length(output_pairwise_cut)
-sum(output_pairwise_pval < 0.05)/length(output_pairwise_pval)
-sum(output_pairwise_pval < 0.000001)/length(output_pairwise_pval)
+# sum(output_pairwise_cut)/length(output_pairwise_cut)
+# sum(output_pairwise_pval < 0.05)/length(output_pairwise_pval)
+# sum(output_pairwise_pval < 0.000001)/length(output_pairwise_pval)
+
+# identify those with highest/lowest accuracy (excluding identities)
+idx_acc <- which(output_pairwise_acc < 0.25 | output_pairwise_acc > 0.75 & output_pairwise_acc != 1)
+idx_acc <- which(output_pairwise_acc > 0.75 & output_pairwise_acc != 1)
+
+head(idx_acc)
+tail(idx_acc)
+
+highAccPlots <- mat[idx_acc, ]
+str(highAccPlots)
+
+# plot highly accurate combinations
+par(mfrow = c(2, 2))
+for(i in 1:16){
+        # for(j in 1:4){
+                plot(jitter(as.numeric(trainChiSq[ , as.character(highAccPlots[4, 1])], 2)), 
+                     jitter(as.numeric(trainChiSq[ , as.character(highAccPlots[i, 2])], 2)),
+                     # xlab = as.character(highAccPlots[j, 1]),
+                     ylab = as.character(highAccPlots[i, 2]),
+                     # main = j,
+                     cex = 0.1)
+        # }
+}
+par(mfrow = c(1, 1))
 
 
 
+# identify those with lowest p values
+lowestX2 <- idx_p.val[104:119]
+highCorPlots <- mat[lowestX2, ]
+length(lowestX2)
+str(highCorPlots)
+# plot highly correlated variables against a range of others
+par(mfrow = c(2, 2))
+for(i in 1:16){
+        for(j in 1:4){
+        plot(jitter(as.numeric(trainChiSq[ , as.character(highCorPlots[j, 1])], 2)), 
+             jitter(as.numeric(trainChiSq[ , as.character(highCorPlots[i, 2])], 2)),
+             xlab = as.character(highCorPlots[j, 1]),
+             ylab = as.character(highCorPlots[i, 2]),
+             main = j,
+             cex = 0.1)
+        }
+}
+par(mfrow = c(1, 1))
 
+as.character(highCorPlots[1, 1])
 # head(mat)
 # head(trainChiSq[ ,"Q124742"])
 # head(trainChiSq[ , as.character(mat$Var1)[1]])
@@ -220,3 +270,14 @@ question_list[question_list$Question_ID %in% names(c), 1:2]
 # Low degree questions not correlated with outcome
 d <- lo_corr_Q[!c(names(lo_corr_Q) %in% sigQs)]
 question_list[question_list$Question_ID %in% names(d), 1:2]
+
+
+#################################################################################
+# Kappa statistic
+library(irr)
+kappa_df <- cbind(trainChiSq$"Q108343", trainChiSq$"Q102674")
+kappa_df <- cbind(trainChiSq$"Q108343", trainChiSq$"Q108343")
+
+
+
+kappa2(kappa_df, weight = "unweighted")
