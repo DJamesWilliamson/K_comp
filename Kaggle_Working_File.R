@@ -149,6 +149,31 @@ par(mfrow = c(1, 1))
 
 
 
+# Methods for removing variables
+nonvars = c("year", "songtitle", "artistname", "songID", "artistID")
+SongsTrain = train[ , !(names(train) %in% nonvars) ]
+SongsTest = test[ , !(names(test) %in% nonvars) ])
+
+model3 = glm(Top10 ~ . - energy, data=SongsTrain, family=binomial)
+summary(model3)
+
+covs = names(baseball)
+remove6 = c("Team", "Playoffs", "RankPlayoffs", "G", "WorldSeries")
+# then use
+# ?setdiff
+covs = setdiff(covs, remove6)
+# OR
+# idx = which(covs %in% remove6)
+# covs = covs[-idx]
+
+remove2 = c("RS", "W", "OBP", "SLG", "BA", "OOBP", "OSLG", "League")
+covs = setdiff(covs, remove2)
+covs
+cor_covs = paste("baseball$",covs, sep = "")
+
+vars.for.imputation = setdiff(names(loans), "not.fully.paid") #present in first but not second set
+
+
 
 
 

@@ -49,6 +49,7 @@ test$EducationLevel <- ordered(test$EducationLevel,
 # Basic model to predict Party using all other variables in the dataset, 
 # except for the first, X:
 SimpleMod = glm(Party ~ . -USER_ID, data=train, family=binomial)
+summary(SimpleMod)
 
 # Make predictions on the test set:
 PredTest = predict(SimpleMod, newdata=test, type="response")
