@@ -174,6 +174,16 @@ cor_covs = paste("baseball$",covs, sep = "")
 vars.for.imputation = setdiff(names(loans), "not.fully.paid") #present in first but not second set
 
 
+##############################################################################
+# Convert factor variables to numeric
+# get list of questions i.e. all columns starting with a 'Q'
+questions = grep("^Q",names(train))
+
+# loop over all the questions
+for (i in questions) {
+        # convert the ith question, note double brackets [[ notation ...
+        train[[i]] = as.numeric(train[[i]]) - 1
+}
 
 
 

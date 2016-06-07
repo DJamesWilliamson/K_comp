@@ -47,6 +47,14 @@ test$EducationLevel <- ordered(test$EducationLevel,
                                           "Current Undergraduate", "Associate's Degree",
                                           "Bachelor's Degree", "Master's Degree",
                                           "Doctoral Degree"))
+
+# Set up split of train for internal use (then move to new file)
+library(caTools)
+set.seed(88)
+split = sample.split(train$Party, SplitRatio = 0.75)
+inTrain = subset(train, split == TRUE)
+inTest = subset(train, split == FALSE)
+
 # Identify basic covariates
 q_covs <- questions$Question_ID
 nonq_covs <- c("YOB", "Gender", "Income", "HouseholdStatus", "EducationLevel")
@@ -57,7 +65,7 @@ SimpleMod = glm(Party ~ . -USER_ID, data=train, family=binomial)
 # This was used with imp3_set1 in TestSubmission and gave ~0.58
 
 ################################################################################
-# Set up covariates to exclude from the analysis
+# glm3: Set up covariates to exclude from the analysis
 covs <- names(train)
 omit_covs <- c("USER_ID", "Party")
 
@@ -74,6 +82,7 @@ covs <- paste(covs, sep="", collapse=" + ")
 model_formula <- c("Party", covs) 
 model_formula <- paste(model_formula, sep="", collapse=" ~ ")
 
+################################################################################
 # Run model
 model_glm3 <- glm(as.formula(model_formula), data = train, family = "binomial")
 summary(model_glm3)
@@ -90,7 +99,7 @@ write.csv(Sub_glm3, "Sub_glm3.csv", row.names=FALSE)
 # Score 0.599 with imp3_set1 (glm1)
 # Score 0.615 with imp1_set1 (glm3)
 ################################################################################
-# Set up covariates to include in the analysis
+# glm4: Set up covariates to include in the analysis
 
 # Variables associated with the outcome (Party) using ChiSq
 sigQs <- read.csv("sigQs.csv", stringsAsFactors = FALSE)
@@ -132,4 +141,194 @@ questions[questions$Question_ID %in% q_pool_1, 3]
 q_pool_2 <- q_pool_1[-which(q_pool_1 %in% insigQs)]
 questions[questions$Question_ID %in% q_pool_2, 3]
 
+################################################################################
+################################################################################
+# glm5: Set up covariates to include in the analysis
 
+# Variables associated with Questions associated with Party in ChiSq or with face validity
+covs <- c(nonq_covs, q_pool_1)
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Run model
+model_glm5 <- glm(as.formula(model_formula), data = train, family = "binomial")
+summary(model_glm5)
+model_glm <- model_glm5
+
+# Make predictions on the test set:
+PredTest = predict(model_glm, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+#################################################################################
+# glm6: Set up covariates to include in the analysis
+
+# As above but excluding those not associated with Party in ChiSq
+covs <- c(nonq_covs, q_pool_2)
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Run model
+model_glm6 <- glm(as.formula(model_formula), data = train, family = "binomial")
+summary(model_glm6)
+model_glm <- model_glm6
+
+# Make predictions on the test set:
+PredTest = predict(model_glm, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+################################################################################
+################################################################################
+# Explore variable options after reviewing successful glms to date:
+cov_consensus <- read.table("cov_consensus.txt", stringsAsFactors = FALSE)
+str(cov_consensus)
+cov_consensus <- cov_consensus$V1
+
+cov_frequent <- read.table("cov_frequent.txt", stringsAsFactors = FALSE)
+str(cov_frequent)
+cov_frequent <- cov_frequent$V1
+
+cov_optimum <- read.table("cov_optimum.txt", stringsAsFactors = FALSE)
+str(cov_optimum)
+cov_optimum <- cov_optimum$V1
+################################################################################
+# glm7: 
+# Set up covariates to include in the analysis: use optimum covariates
+covs <- c(cov_optimum)
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Run model
+model_glm7 <- glm(as.formula(model_formula), data = train, family = "binomial")
+summary(model_glm7)
+model_glm <- model_glm7
+
+PredTest = predict(model_glm, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_glm7 = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
+write.csv(Sub_glm7, "Sub_glm7.csv", row.names=FALSE)
+
+
+################################################################################
+# glm8: 
+# Set up covariates to include in the analysis: use frequent covariates
+covs <- c(cov_frequent)
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Run model
+model_glm8 <- glm(as.formula(model_formula), data = train, family = "binomial")
+summary(model_glm8)
+model_glm <- model_glm8
+
+# PredTest = predict(model_glm, newdata=test, type="response")
+# threshold = 0.5
+# PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+# 
+# #Prepare submission (note will need to incorporate USER_ID from original test2016)
+# Sub_glm8 = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
+# write.csv(Sub_glm8, "Sub_glm8.csv", row.names=FALSE)
+
+# Refine model with step function (backwards)
+backwards <- step(model_glm)
+
+PredTest = predict(backwards, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_glm8_back = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
+write.csv(Sub_glm8_back, "Sub_glm8_back.csv", row.names=FALSE)
+
+# Refine model with step function (forwards)
+nothing <- glm(Party ~ 1, data = test, family = "binomial")
+
+forwards <- step(nothing, scope = list(lower = nothing, upper = formula(model_glm7)), 
+                 direction = "forward")
+
+PredTest = predict(forwards, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_glm8_forw = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
+write.csv(Sub_glm8_forw, "Sub_glm8_forw.csv", row.names=FALSE)
+
+################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+# glm9: did not perform well
+# Set up covariates to include in the analysis: use consensus covariates
+covs <- c(cov_consensus)
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Run model
+model_glm9 <- glm(as.formula(model_formula), data = train, family = "binomial")
+summary(model_glm9)
+model_glm <- model_glm9
+
+PredTest = predict(model_glm, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_glm9 = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
+write.csv(Sub_glm9, "Sub_glm9.csv", row.names=FALSE)
+
+# Refine model with step function (backwards)
+backwards <- step(model_glm)
+
+PredTest = predict(backwards, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_glm9_back = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
+write.csv(Sub_glm9_back, "Sub_glm9_back.csv", row.names=FALSE)
+
+# Refine model with step function (forwards)
+nothing <- glm(Party ~ 1, data = test, family = "binomial")
+
+forwards <- step(nothing, scope = list(lower = nothing, upper = formula(model_glm9)), 
+                 direction = "forward")
+
+PredTest = predict(forwards, newdata=test, type="response")
+threshold = 0.5
+PredTestLabels = as.factor(ifelse(PredTest<threshold, "Democrat", "Republican"))
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_glm9_forw = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
+write.csv(Sub_glm9_forw, "Sub_glm9_forw.csv", row.names=FALSE)
+
+################################################################################
