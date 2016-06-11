@@ -361,18 +361,11 @@ checkAccuracy2x2(conf_matrix)
 
 
 
+ls()
 
 
 
 
 
 
-
-
-
-#Prepare submission (note will need to incorporate USER_ID from original test2016)
-Sub_glm3 = data.frame(USER_ID = test2016$USER_ID, Predictions = PredTestLabels)
-write.csv(Sub_glm3, "Sub_glm3.csv", row.names=FALSE)
-################################################################################
-################################################################################
 
