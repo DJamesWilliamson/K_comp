@@ -7,6 +7,7 @@ str(questions)
 str(train)
 str(test)
 
+
 # Add USER_ID to both and Party to the train set
 train2016 <- read.csv("train2016.csv", na.strings = c("", "NA"))
 test2016 <- read.csv("test2016.csv", na.strings = c("", "NA"))

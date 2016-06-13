@@ -286,3 +286,67 @@ rf_predict = predict(rf_model, newdata = test)
 Sub_rf6 = data.frame(USER_ID = test2016$USER_ID, Predictions = as.character(rf_predict))
 write.csv(Sub_rf6, "Sub_rf6.csv", row.names=FALSE)
 Sub_rf6
+
+#################################################################################
+# Use of cForest from party package with imp3_mode imputed dataset (follows gbm model)
+
+library(party)
+
+head(train)
+head(test)
+
+# Select covariates for model (all used here)
+covs <- names(test)[-1]
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Build random forest
+set.seed(22)
+rf_model = cforest(as.formula(model_formula), data = train)  # control = cforest_unbiased(ntree = 2000, mtry = 2)
+rf_predict = predict(rf_model, newdata = test, type = "prob")
+rf_predict <- unlist(rf_predict)
+rf_predict <- ifelse(rf_predict < 0.5, "Democrat", "Republican")
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_rf7 = data.frame(USER_ID = test2016$USER_ID, Predictions = rf_predict)
+write.csv(Sub_rf7, "Sub_rf7.csv", row.names=FALSE)
+Sub_rf7
+#################################################################################
+# Repeat of above with additional control settings
+
+set.seed(22)
+rf_model = cforest(as.formula(model_formula), data = train, controls = cforest_unbiased(ntree = 2000, mtry = 3))
+rf_predict = predict(rf_model, newdata = test, type = "prob")
+rf_predict <- unlist(rf_predict)
+rf_predict <- ifelse(rf_predict < 0.5, "Democrat", "Republican")
+prop.table(table(rf_predict))   # 66% Democrat
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_rf8 = data.frame(USER_ID = test2016$USER_ID, Predictions = rf_predict)
+write.csv(Sub_rf8, "Sub_rf8.csv", row.names=FALSE)
+Sub_rf8
+
+#################################################################################
+# Reduced covariates
+
+# Select covariates for model (all used here)
+covs <- c(cov_sigQplus, "Income", "EducationLevel")
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Build random forest
+set.seed(22)
+rf_model = cforest(as.formula(model_formula), data = train, controls = cforest_unbiased(ntree = 2000, mtry = 2))
+rf_predict = predict(rf_model, newdata = test, type = "prob")
+rf_predict <- unlist(rf_predict)
+rf_predict <- ifelse(rf_predict < 0.49, "Democrat", "Republican")
+prop.table(table(rf_predict))   # 51% Democrat @ 0.5; 46% @ 0.49
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_rf9 = data.frame(USER_ID = test2016$USER_ID, Predictions = rf_predict)
+write.csv(Sub_rf9, "Sub_rf9.csv", row.names=FALSE)
+Sub_rf9
