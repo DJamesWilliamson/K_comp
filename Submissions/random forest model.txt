@@ -1,0 +1,24 @@
+################################################################################
+################################################################################
+# Trial of random forest model with mode of imp3 (20 iterations in mice)
+
+train <- train_imp3_mode
+test <- test_imp3_mode
+
+# Select covariates for model
+covs <- names(test)
+
+# Set up formulation
+covs <- paste(covs, sep="", collapse=" + ") 
+model_formula <- c("Party", covs) 
+model_formula <- paste(model_formula, sep="", collapse=" ~ ")
+
+# Build random forest
+set.seed(22)
+rf_model = randomForest(as.formula(model_formula), data = train)
+rf_predict = predict(rf_model, newdata = test)
+
+#Prepare submission (note will need to incorporate USER_ID from original test2016)
+Sub_rf6 = data.frame(USER_ID = test2016$USER_ID, Predictions = as.character(rf_predict))
+write.csv(Sub_rf6, "Sub_rf6.csv", row.names=FALSE)
+Sub_rf6
