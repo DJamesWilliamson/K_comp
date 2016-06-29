@@ -1,0 +1,102 @@
+Successful Kaggle approaches
+
+	
+Ayush Singh
+My general approach was as follows:
+
+    Split the training set into a secondary training and validation set.
+    Determine the average response rate or ratio of Democrats to Republicans in the dataset. The ratio was about 52% to 48%. As others have suggested, this was done to separate the signal from the noise.
+    New variable creation: I created lots of new variables after examining the data. The only ones that turned to be significant were (a) Age (derived from YOB) and then grouped by different ranges. I tried a few different ranges including depending on the ratio of democrats/republicans in the data. (b) an indicator variable for those people who don't pray or meditate (c) an indicator variable for those people whose education level was less than a bachelors degree
+    Data imputation - I tried MICE for imputing everything (was taking too long) and then only imputed the demographic data. I also used decision trees to impute everything and that gave marginally decent results. However, it didn't make sense to assign responses to people who hadn't responded to the question.
+    Variable selection - (a) Manual approach was to read all the questions (b) Used the p-values from the logistic regression model based on all the variables to determine which ones to keep (c) Step-wise selection method (using SAS since its infinitely faster than R). There is a python library for variable selection as well in sklearn but I am forgetting which one. (d) Used RF and GBM variable importance measures as well. (e) Used the Lasso and Ridge regression algorithms for variable selection as well since they are useful dimension regression techniques. Depending on the algorithm I used a different set of predictors. At certain times I used brute force and threw everything against the wall to see what stuck. At times I did want to throw my laptop as well due to frustration but I kept at it.
+    Algorithms used (1) Logistic Regression with all and limited set of predictors 2) Cluster-wise prediction - My first time using this. Very interesting approach. Will definitely try this again in the future since this helps in generating new insights about the data even if it doesnt do anything for the predictions :) 3) SVM (from e1071) 4) GBM (lots of tuning done on these) 5) RF (takes too long so I usually only use this as one benchmark) 6) Logistic Ridge Regression and Lasso 7) Ensembles
+    Probability cutoffs - In my submissions I used the cutoff close to whatever gave me the highest accuracy/AUC on my validation set. So, this changed for each submission.
+
+My best results came from ensembling the various models. The ensembling approaches I used were from http://mlwave.com/kaggle-ensembling-guide/.
+
+My very first submission was a GBM using 100 trees on the raw data- public score - 0.64799, private score - 0.63793
+
+My final submission was: public score - 0.72701, private score - 0.72701
+
+This was an awesome learning experience due to everyone's contribution on the boards and I learnt so much in the process.
+
+Disclaimer: I have never scored exactly the same on public and private leaderboards before so that was a pleasant surprise. I wrote a lot of code just to get my R skills back into shape for this Kaggle.
+
+________________________________________________________________________________________________________
+Wynnie
+
+
+This is the method that I used for a score of 0.674 on the leaderboard.
+
+    Impute all demographic data (not the question data) with MICE and Amelia. I did about 15 imputations with each package with different seeds and averaged the predictions.
+
+EDIT : I also added a couple of new features, % of unanswered questions and % of "Yes" questions which turned out to be significant predictors.
+
+    Choose a set of questions based on logistic regression importance and my reading of the questions. Final set used was all demographic data along with :
+
+"Q96024" "Q98197" "Q98869" "Q99480" "Q101163" "Q106272" "Q108617" "Q108754" "Q108855" "Q109244" "Q110740" "Q112512" "Q113181" "Q114152" "Q114961" "Q115195" "Q115610" "Q115611" "Q115899" "Q116601" "Q116953" "Q118117" "Q118232" "Q119851" "Q120379" "Q120472" "Q120650" "Q120194" "Q112478" "Q106389" "Q101596" "Q100689" "Q98578" "Q98059"
+
+    Created a set of 6 models
+        RandomForest with 2601 trees
+        SVM (no tuning)
+        GLMNet
+        XGBoost (tuned various parameters and recoded questions to -1,0,1)
+        ADABoost (mfinal = 350)
+        NaiveBayes
+
+Each one of these models was tuned with cross validation to find good set of parameters.
+
+    I now stacked these models. This is an interesting technique I read about after I was pointed to it on the forum. Instead of averaging the predictions, stacking is supposed to improve the score by combining predictions of various "different" models along with the original data using another machine learning model. The model I used for stacking was GLMNet.
+
+It was a really interesting exercise. I learnt quite a bit from it, especially since every algorithm has different kinds of input and required a little pre-processing. I also was forced to develop a good cross validation framework to see if my efforts yielded an improvement. I was happy that my cross-validated results matched pretty closely with the final leaderboard, i.e a model that performed better in CV performed better in the final scoring.
+
+Of course there was the availability of the 2014 dataset. I think there is another post on this forum that shows how you can get a score of 0.9 with that. It was really simple to just strip away the user ID and check for duplicate rows and copy the Party information from the 2014 set into the 2016 test set.
+
+Will be great to hear about other's techniques.
+
+crossValidate <- function(df, nfolds, modeler,alpha=0) {
+  cv.acc <- vector(mode="numeric", length=nfolds)
+  set.seed(113341)
+  folds <- sample(rep(1:nfolds,length=nrow(df)))
+  for(k in 1:nfolds) {
+    pred <- modeler(train=df[folds!=k,],test=df[folds==k,],alpha=alpha)
+    tab <- table(df[folds == k,]$Party,pred>0.5)
+    cv.acc[k] <- sum(diag(tab))/sum(tab)
+    print(paste0("Finished fold ",k,"/",nfolds))
+  } 
+  avgAcc <- mean(cv.acc)
+  return (avgAcc)
+}
+
+And this is an example of a "modeler"
+
+rfModeler <- function(train,test,alpha=2601) {
+  print(paste0("Running rfModeler"))
+  rfMod6 <- randomForest(Party ~ . -USER_ID-submit, data=train, ntree=alpha)
+  rfTestPred <- predict(rfMod6, newdata=test,type="prob")[,2]
+  return (rfTestPred)
+}
+
+And used this way to get cross validated accuracy:
+
+rfTestAccuracy1 <- crossValidate(df=train,nfolds=5,alpha=2601,modeler=rfModeler)
+
+_nfolds is an input to the crossValidate function. It decides the number of folds to use for cross validation. The test set will be 1/nfolds of the entire input dataframe and nfolds models will be built and their accuracy will be averaged. _______________________________________________________________________________________________________
+Naveen Mathew
+
+
+
+My score isn't that high, but this competition got me excited.
+
+Feature engineering: Although not recommended, I treated NA as separate category and created dummy variables for each column. I calculated the base rate of Party="Republican". For each variable I calculated P(Party="Republican"|Variable="1") and put the variable in 'positive' bucket if this probability is more than base rate; else I put the variable in 'negative' bucket.
+
+For each variable in positive group I iteratively used OR condition to combine with other variables. For each variable P(Party="Republican"|X1 OR V2 ="1") > P(Party="Republican"|X1 ="1") and P(Party="Republican"|V2 ="1"), choose V2 with highest value of P(Party="Republican"|X1 OR V2 ="1"). Create new column X1 OR V2 and remove X1, V2. This kind of looks like greedy search and may be sub-optimal as I'm looping from column 1 to column n.
+
+I built several models and attempted to ensemble them using my own code. However the run-time was long; I had to compromise with a single model's answer. I chose bartMachine over randomForest, glm, glmnet, C5.0, knn, rpart, naiveBayes, nnet, svm (didn't predict probabilities), etc after I was convinced that the classifier was stable (seed parameter should be set while modeling).
+
+For assessing classifier stability: I split the data set into train, validation and test sets. I built the model on train and predicted on validation and test sets. I obtained the following 2 graphs on validation and test sets: 1) ROC curve, 2) Accuracy vs threshold curve. I assumed that the solution would be stable if these curves are comparable for validation and test sets.
+
+It was very exciting. I'm 90% convinced that my finish in top 10% is not luck. At one point I had to look through hundreds of graphs to prevent tune randomForest. The only regret I have is that I could not get my secret weapon (ensemble) to work on time.
+
+
+________________________________________________________________________________________________________
